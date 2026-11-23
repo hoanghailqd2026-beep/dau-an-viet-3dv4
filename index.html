@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function() {
+        try {
+          var _currentFetch = window.fetch;
+          Object.defineProperty(window, 'fetch', {
+            get: function() {
+              return _currentFetch;
+            },
+            set: function(newFetch) {
+              _currentFetch = newFetch;
+            },
+            configurable: true,
+            enumerable: true
+          });
+        } catch (e) {
+          // Fallback if needed
+        }
+      })();
+    </script>
+    <title>Dấu Ấn Việt 3D — Bảo tàng Số Di sản Đông Nam Bộ</title>
+    <meta name="description" content="Không gian bảo tàng số tương tác 3D, bản đồ lịch sử 1815 và học liệu di sản văn hóa Đông Nam Bộ." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.svg" />
+    <meta property="og:title" content="Dấu Ấn Việt 3D — Bảo tàng Số Di sản Đông Nam Bộ" />
+    <meta property="og:description" content="Không gian bảo tàng số tương tác 3D, bản đồ lịch sử 1815 và học liệu di sản văn hóa Đông Nam Bộ." />
+    <meta property="og:image" content="/og-image.svg" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Dấu Ấn Việt 3D — Bảo tàng Số Di sản Đông Nam Bộ" />
+    <meta name="twitter:image" content="/og-image.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Lora:ital,wght@0,500;0,600;0,700;1,400;1,500;1,600&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body class="bg-[#000000] text-[#F5F5F7] antialiased selection:bg-[#0071E3] selection:text-white font-sans">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

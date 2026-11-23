@@ -1,0 +1,300 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model — Dấu Ấn Việt 3D (Chunked 3-Tier Cloud Sync)
+// ===============================================================
+//
+// Collection: /heritage_sites/{siteId}
+//   - Public museum catalog metadata (zero PII). Public read; Admin-only validated write.
+//
+// Collection: /site_models/{siteId}
+//   - 3D model URLs / chunk pointers, scale/rotation/dissection calibration & hotspots.
+//     Public read; Admin-only write.
+//
+// Collection: /site_audio/{siteId}
+//   - Audio narration URLs / chunk pointers & script overrides. Public read; Admin-only write.
+//
+// Collection: /cloud_assets_meta/{docId}
+//   - Chunked binary asset manifest ({ assetType, siteId, fileName, mimeType, totalChunks,
+//     totalSize, updatedAt, checksum }). Public read for cross-device / Remix hydration;
+//     Admin-only write.
+//
+// Collection: /cloud_assets_chunks/{docId}
+//   - Individual 350KB Base64 chunks ({ assetType, siteId, chunkIndex, totalChunks, data,
+//     updatedAt }) supporting up to 25MB/file on Firebase free tier without Cloud Storage.
+//     Public read; Admin-only write.
+//
+// Collection: /_healthCheck/{docId}
+//   - Live read/write connectivity probe used by Admin Studio. Public get; Admin-only write.
+//
+// Collection: /media_credits/{chunkId}
+//   - Chunked archival citations (<= 35 entries per chunk). Public read; Admin-only write.
+//
+// Collection: /global_settings/{docId}
+//   - Global site display settings and hidden monument IDs. Public read; Admin-only write.
+//
+// Collection: /heritage_cloud_sync/{docId}
+//   - Master manifest containing `updatedAt` timestamp for Local vs Cloud conflict comparison.
+//     Public read; Admin-only write.
+//
+// Collection: /admins/{uid}
+//   - Verified administrator allowlist. Self/Admin get; Admin-only list & write.
+//
+// Document: /test/connection
+//   - Read-only connectivity probe document.
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // -------------------------------------------------------------
+    // Helper Functions
+    // -------------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 160 && id.matches('^[a-zA-Z0-9._-]+$');
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (
+          request.auth.token.email_verified == true &&
+          (
+            request.auth.token.email == 'hoanghailqd2026@gmail.com' ||
+            request.auth.token.email == 'bivsmoon2023@gmail.com'
+          )
+        )
+      );
+    }
+
+    function isValidTimestampString(val) {
+      return val is string && val.size() >= 10 && val.size() <= 64;
+    }
+
+    function isOptionalString(data, field, maxLen) {
+      return !(field in data) || data[field] == null || (data[field] is string && data[field].size() <= maxLen);
+    }
+
+    function isValidHeritageSite(data) {
+      return data.keys().hasAll(['siteId', 'updatedAt']) &&
+        data.siteId is string && data.siteId.size() >= 1 && data.siteId.size() <= 64 &&
+        isValidTimestampString(data.updatedAt) &&
+        isOptionalString(data, 'code', 16) &&
+        isOptionalString(data, 'officialName', 300) &&
+        isOptionalString(data, 'visibility', 32) &&
+        isOptionalString(data, 'summary', 20000) &&
+        isOptionalString(data, 'chronology', 20000) &&
+        isOptionalString(data, 'architecturalStyle', 20000) &&
+        isOptionalString(data, 'conservationNotes', 20000) &&
+        (!('photos' in data) || (data.photos is list && data.photos.size() <= 12));
+    }
+
+    function isValidSiteModel(data) {
+      return data.keys().hasAll(['siteId', 'updatedAt']) &&
+        data.siteId is string && data.siteId.size() >= 1 && data.siteId.size() <= 64 &&
+        isValidTimestampString(data.updatedAt) &&
+        isOptionalString(data, 'modelUrl', 4096) &&
+        isOptionalString(data, 'fileName', 256) &&
+        isOptionalString(data, 'storagePath', 512) &&
+        (!('fileSize' in data) || data.fileSize == null || (data.fileSize is number && data.fileSize >= 0)) &&
+        (!('scale' in data) || (data.scale is number && data.scale > 0 && data.scale <= 100)) &&
+        (!('rotationY' in data) || data.rotationY is number) &&
+        (!('explosionFactor' in data) || (data.explosionFactor is number && data.explosionFactor >= 0 && data.explosionFactor <= 10)) &&
+        (!('layerOffsets' in data) || (data.layerOffsets is list && data.layerOffsets.size() <= 8)) &&
+        (!('hotspots' in data) || (data.hotspots is list && data.hotspots.size() <= 50));
+    }
+
+    function isValidSiteAudio(data) {
+      return data.keys().hasAll(['siteId', 'updatedAt']) &&
+        data.siteId is string && data.siteId.size() >= 1 && data.siteId.size() <= 64 &&
+        isValidTimestampString(data.updatedAt) &&
+        isOptionalString(data, 'audioUrl', 4096) &&
+        isOptionalString(data, 'fileName', 256) &&
+        isOptionalString(data, 'storagePath', 512) &&
+        (!('fileSize' in data) || data.fileSize == null || (data.fileSize is number && data.fileSize >= 0)) &&
+        (!('durationSec' in data) || data.durationSec == null || (data.durationSec is number && data.durationSec >= 0));
+    }
+
+    function isValidCloudAssetMeta(data) {
+      return data.keys().hasAll(['assetType', 'siteId', 'fileName', 'mimeType', 'totalChunks', 'totalSize', 'updatedAt', 'checksum']) &&
+        data.assetType in ['models', 'audio', 'images', 'videos'] &&
+        data.siteId is string && data.siteId.size() >= 1 && data.siteId.size() <= 120 &&
+        data.fileName is string && data.fileName.size() >= 1 && data.fileName.size() <= 256 &&
+        data.mimeType is string && data.mimeType.size() >= 1 && data.mimeType.size() <= 128 &&
+        data.totalChunks is number && data.totalChunks >= 1 && data.totalChunks <= 120 &&
+        data.totalSize is number && data.totalSize >= 1 && data.totalSize <= 26214400 &&
+        data.checksum is string && data.checksum.size() >= 1 && data.checksum.size() <= 128 &&
+        isValidTimestampString(data.updatedAt);
+    }
+
+    function isValidCloudAssetChunk(data) {
+      return data.keys().hasAll(['assetType', 'siteId', 'chunkIndex', 'totalChunks', 'data', 'updatedAt']) &&
+        data.assetType in ['models', 'audio', 'images', 'videos'] &&
+        data.siteId is string && data.siteId.size() >= 1 && data.siteId.size() <= 120 &&
+        data.chunkIndex is number && data.chunkIndex >= 0 && data.chunkIndex < 120 &&
+        data.totalChunks is number && data.totalChunks >= 1 && data.totalChunks <= 120 &&
+        data.data is string && data.data.size() >= 1 && data.data.size() <= 550000 &&
+        isValidTimestampString(data.updatedAt);
+    }
+
+    function isValidSiteVideo(data) {
+      return data.keys().hasAll(['siteId', 'updatedAt']) &&
+        data.siteId is string && data.siteId.size() >= 1 && data.siteId.size() <= 64 &&
+        isValidTimestampString(data.updatedAt) &&
+        isOptionalString(data, 'videoKey', 16) &&
+        isOptionalString(data, 'customUrl', 4096) &&
+        isOptionalString(data, 'embedUrl', 4096) &&
+        isOptionalString(data, 'kind', 32) &&
+        isOptionalString(data, 'titleVi', 400) &&
+        isOptionalString(data, 'titleEn', 400) &&
+        isOptionalString(data, 'titleZh', 400) &&
+        isOptionalString(data, 'sourceNote', 500) &&
+        isOptionalString(data, 'chunkAssetKey', 120);
+    }
+
+    function isValidSyncStateDoc(data) {
+      return data.keys().hasAll(['branch', 'updatedAt']) &&
+        data.branch is string && data.branch.size() >= 1 && data.branch.size() <= 64 &&
+        isValidTimestampString(data.updatedAt) &&
+        (!('itemCount' in data) || (data.itemCount is number && data.itemCount >= 0 && data.itemCount <= 10000));
+    }
+
+    function isValidHealthCheckProbe(data) {
+      return data.keys().hasAll(['ok', 'timestamp']) &&
+        data.ok is bool &&
+        isValidTimestampString(data.timestamp) &&
+        isOptionalString(data, 'checkedBy', 256) &&
+        isOptionalString(data, 'transport', 64);
+    }
+
+    function isValidMediaCreditsChunk(data) {
+      return data.keys().hasAll(['chunkIndex', 'totalChunks', 'items', 'updatedAt']) &&
+        data.chunkIndex is number && data.chunkIndex >= 0 && data.chunkIndex < 100 &&
+        data.totalChunks is number && data.totalChunks >= 1 && data.totalChunks <= 100 &&
+        data.items is list && data.items.size() <= 50 &&
+        isValidTimestampString(data.updatedAt);
+    }
+
+    function isValidGlobalSettings(data) {
+      return data.keys().hasAll(['updatedAt']) &&
+        isValidTimestampString(data.updatedAt) &&
+        isOptionalString(data, 'bakedVersion', 128) &&
+        (!('hiddenHeritageIds' in data) || (data.hiddenHeritageIds is list && data.hiddenHeritageIds.size() <= 100));
+    }
+
+    function isValidSyncManifest(data) {
+      return data.keys().hasAll(['updatedAt']) &&
+        isValidTimestampString(data.updatedAt) &&
+        isOptionalString(data, 'lastGlobalSyncAt', 64) &&
+        isOptionalString(data, 'version', 128) &&
+        isOptionalString(data, 'pushedBy', 256) &&
+        (!('siteCount' in data) || (data.siteCount is number && data.siteCount >= 0 && data.siteCount <= 500));
+    }
+
+    // -------------------------------------------------------------
+    // Read-Only Startup Health Probe & Admin Write Health Check
+    // -------------------------------------------------------------
+    match /test/connection {
+      allow get: if true;
+      allow list, write: if false;
+    }
+
+    match /_healthCheck/{docId} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow create, update: if isAdmin() && isValidId(docId) && isValidHealthCheckProbe(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------
+    // Chunked Binary Assets (3D .GLB, 17 Audio, Uploaded Images & Videos)
+    // -------------------------------------------------------------
+    match /cloud_assets_meta/{docId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidId(docId) && isValidCloudAssetMeta(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /cloud_assets_chunks/{docId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidId(docId) && isValidCloudAssetChunk(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------
+    // Public Heritage Catalog & Unified Multi-Asset Sync Collections
+    // -------------------------------------------------------------
+    match /heritage_sites/{siteId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidId(siteId) && isValidHeritageSite(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /site_models/{siteId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidId(siteId) && isValidSiteModel(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /site_audio/{siteId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidId(siteId) && isValidSiteAudio(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /site_videos/{siteId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidId(siteId) && isValidSiteVideo(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /sync_state/{docId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidId(docId) && isValidSyncStateDoc(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /media_credits/{chunkId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidId(chunkId) && isValidMediaCreditsChunk(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /global_settings/{docId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidId(docId) && isValidGlobalSettings(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /heritage_cloud_sync/{docId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidId(docId) && isValidSyncManifest(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------
+    // Admin Allowlist (No Self-Escalation)
+    // -------------------------------------------------------------
+    match /admins/{uid} {
+      allow get: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      allow create, update: if isAdmin() &&
+        request.resource.data.keys().hasAll(['uid', 'email', 'role']) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.email is string &&
+        request.resource.data.role in ['admin', 'super_admin'];
+      allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------
+    // Default Deny Catch-All
+    // -------------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

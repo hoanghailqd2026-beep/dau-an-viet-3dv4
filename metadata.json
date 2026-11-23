@@ -1,0 +1,10 @@
+{
+  "name": "Ất tưởng chất",
+  "description": "Hệ thống thông tin địa lý (GIS) bảo tồn và phát huy giá trị di sản văn hóa vật thể TP. Hồ Chí Minh với công nghệ 3D/VR360, đối chiếu bản đồ lịch sử Sài Gòn - Gia Định, tọa độ chuẩn VN-2000/WGS84, thuyết minh đa ngữ và quản trị thẩm định chuyên môn.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

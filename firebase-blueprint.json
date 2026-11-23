@@ -1,0 +1,229 @@
+{
+  "entities": {
+    "HeritageSiteDoc": {
+      "title": "HeritageSiteDoc",
+      "description": "Lightweight metadata, high-resolution photo URLs, captions, and editorial overrides for each of the 17 heritage monuments.",
+      "type": "object",
+      "properties": {
+        "siteId": { "type": "string", "description": "Unique heritage monument identifier (e.g. HCM-DT-001)" },
+        "code": { "type": "string", "description": "Two-digit archival code (01 to 17)" },
+        "officialName": { "type": "string", "description": "Official monument name" },
+        "photos": { "type": "array", "items": { "type": "string" }, "description": "Primary and secondary high-resolution photo URLs" },
+        "visibility": { "type": "string", "enum": ["published", "hidden"] },
+        "summary": { "type": "string" },
+        "chronology": { "type": "string" },
+        "architecturalStyle": { "type": "string" },
+        "conservationNotes": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["siteId", "updatedAt"]
+    },
+    "SiteModelDoc": {
+      "title": "SiteModelDoc",
+      "description": "3D model cloud reference (CDN URL or chunked DB pointer), transform calibration, explosion dissection settings, and hotspots.",
+      "type": "object",
+      "properties": {
+        "siteId": { "type": "string" },
+        "modelUrl": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileSize": { "type": "number" },
+        "storagePath": { "type": "string" },
+        "scale": { "type": "number" },
+        "rotationY": { "type": "number" },
+        "explosionFactor": { "type": "number" },
+        "layerOffsets": { "type": "array", "items": { "type": "number" } },
+        "hotspots": { "type": "array" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["siteId", "updatedAt"]
+    },
+    "SiteAudioDoc": {
+      "title": "SiteAudioDoc",
+      "description": "Audio narration cloud reference (.m4a/.mp3 CDN URL or chunked DB pointer), duration metadata, and script overrides.",
+      "type": "object",
+      "properties": {
+        "siteId": { "type": "string" },
+        "audioUrl": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileSize": { "type": "number" },
+        "durationSec": { "type": "number" },
+        "storagePath": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["siteId", "updatedAt"]
+    },
+    "CloudAssetMetaDoc": {
+      "title": "CloudAssetMetaDoc",
+      "description": "Metadata manifest for a chunked 3D model (.glb), audio narration (.m4a/.mp3), uploaded image, or short video (<=25MB) stored across 350KB Base64 chunks.",
+      "type": "object",
+      "properties": {
+        "assetType": { "type": "string", "enum": ["models", "audio", "images", "videos"] },
+        "siteId": { "type": "string" },
+        "fileName": { "type": "string" },
+        "mimeType": { "type": "string" },
+        "totalChunks": { "type": "number" },
+        "totalSize": { "type": "number" },
+        "checksum": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["assetType", "siteId", "fileName", "mimeType", "totalChunks", "totalSize", "updatedAt", "checksum"]
+    },
+    "CloudAssetChunkDoc": {
+      "title": "CloudAssetChunkDoc",
+      "description": "Fixed 350KB Base64 slice belonging to a chunked binary asset (3D, audio, image, or video up to 25MB/file on Firebase free tier).",
+      "type": "object",
+      "properties": {
+        "assetType": { "type": "string", "enum": ["models", "audio", "images", "videos"] },
+        "siteId": { "type": "string" },
+        "chunkIndex": { "type": "number" },
+        "totalChunks": { "type": "number" },
+        "data": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["assetType", "siteId", "chunkIndex", "totalChunks", "data", "updatedAt"]
+    },
+    "SiteVideoDoc": {
+      "title": "SiteVideoDoc",
+      "description": "External YouTube/Vimeo/CDN video links and chunked local video references per heritage monument.",
+      "type": "object",
+      "properties": {
+        "siteId": { "type": "string" },
+        "videoKey": { "type": "string" },
+        "customUrl": { "type": "string" },
+        "embedUrl": { "type": "string" },
+        "kind": { "type": "string" },
+        "titleVi": { "type": "string" },
+        "titleEn": { "type": "string" },
+        "titleZh": { "type": "string" },
+        "sourceNote": { "type": "string" },
+        "chunkAssetKey": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["siteId", "updatedAt"]
+    },
+    "SyncStateDoc": {
+      "title": "SyncStateDoc",
+      "description": "Unified cross-device sync snapshots (accounts registry, global config, visitor reviews, quizzes, and lastGlobalSyncAt marker).",
+      "type": "object",
+      "properties": {
+        "branch": { "type": "string" },
+        "payload": { "type": "object" },
+        "itemCount": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["branch", "updatedAt"]
+    },
+    "HealthCheckProbeDoc": {
+      "title": "HealthCheckProbeDoc",
+      "description": "Lightweight read/write verification probe for Admin Studio Firebase health checks.",
+      "type": "object",
+      "properties": {
+        "ok": { "type": "boolean" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "checkedBy": { "type": "string" }
+      },
+      "required": ["ok", "timestamp"]
+    },
+    "MediaCreditsChunk": {
+      "title": "MediaCreditsChunk",
+      "description": "Chunked archival media credits & copyright citations (max 35 items per document).",
+      "type": "object",
+      "properties": {
+        "chunkIndex": { "type": "number" },
+        "totalChunks": { "type": "number" },
+        "items": { "type": "array" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["chunkIndex", "totalChunks", "items", "updatedAt"]
+    },
+    "GlobalSettingsDoc": {
+      "title": "GlobalSettingsDoc",
+      "description": "Global site configuration, visibility toggles, and baked asset schema version.",
+      "type": "object",
+      "properties": {
+        "siteSettings": { "type": "object" },
+        "hiddenHeritageIds": { "type": "array", "items": { "type": "string" } },
+        "bakedVersion": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["updatedAt"]
+    },
+    "CloudSyncManifest": {
+      "title": "CloudSyncManifest",
+      "description": "Master timestamp marker for Local vs Cloud conflict comparison.",
+      "type": "object",
+      "properties": {
+        "version": { "type": "string" },
+        "siteCount": { "type": "number" },
+        "mediaCreditsCount": { "type": "number" },
+        "mediaCreditsChunks": { "type": "number" },
+        "pushedBy": { "type": "string" },
+        "lastGlobalSyncAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["updatedAt"]
+    },
+    "AdminAccount": {
+      "title": "AdminAccount",
+      "description": "Authorized curator and administrator registry keyed by Firebase Auth UID.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["admin", "super_admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    }
+  },
+  "firestore": {
+    "/heritage_sites/{siteId}": {
+      "schema": { "$ref": "#/entities/HeritageSiteDoc" },
+      "description": "Publicly readable heritage monument catalog metadata; admin-only write."
+    },
+    "/site_models/{siteId}": {
+      "schema": { "$ref": "#/entities/SiteModelDoc" },
+      "description": "Publicly readable 3D model references and calibration settings; admin-only write."
+    },
+    "/site_audio/{siteId}": {
+      "schema": { "$ref": "#/entities/SiteAudioDoc" },
+      "description": "Publicly readable audio narration references and script overrides; admin-only write."
+    },
+    "/site_videos/{siteId}": {
+      "schema": { "$ref": "#/entities/SiteVideoDoc" },
+      "description": "Publicly readable documentary video links & chunked video metadata; admin-only write."
+    },
+    "/sync_state/{docId}": {
+      "schema": { "$ref": "#/entities/SyncStateDoc" },
+      "description": "Unified cross-device sync snapshots (accounts, globalConfig, reviews); admin-only write."
+    },
+    "/cloud_assets_meta/{docId}": {
+      "schema": { "$ref": "#/entities/CloudAssetMetaDoc" },
+      "description": "Publicly readable chunked binary asset metadata manifests (models, audio, images, videos); admin-only write."
+    },
+    "/cloud_assets_chunks/{docId}": {
+      "schema": { "$ref": "#/entities/CloudAssetChunkDoc" },
+      "description": "Publicly readable 350KB Base64 binary chunks for 3D models, narrations, images & videos; admin-only write."
+    },
+    "/_healthCheck/{docId}": {
+      "schema": { "$ref": "#/entities/HealthCheckProbeDoc" },
+      "description": "Publicly readable health check probe; admin-only write to verify Rules & DB connectivity."
+    },
+    "/media_credits/{chunkId}": {
+      "schema": { "$ref": "#/entities/MediaCreditsChunk" },
+      "description": "Publicly readable chunked archival citations; admin-only write."
+    },
+    "/global_settings/{docId}": {
+      "schema": { "$ref": "#/entities/GlobalSettingsDoc" },
+      "description": "Publicly readable global banner & visibility settings; admin-only write."
+    },
+    "/heritage_cloud_sync/{docId}": {
+      "schema": { "$ref": "#/entities/CloudSyncManifest" },
+      "description": "Publicly readable cloud sync version manifest; admin-only write."
+    },
+    "/admins/{uid}": {
+      "schema": { "$ref": "#/entities/AdminAccount" },
+      "description": "Admin role registry; owner or admin read, admin-only write."
+    }
+  }
+}
